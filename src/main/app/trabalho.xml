@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <db:mysql-config name="MySQL_Configuration" host="192.168.15.17" port="3306" user="fiapusr" password="fiap2019" database="fiapdb" doc:name="MySQL Configuration"/>
+    <flow name="trabalhoFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/funcionario" allowedMethods="GET,POST,PUT" doc:name="HTTP"/>
+        <choice doc:name="Choice">
+            <when expression="#[message.inboundProperties.'http.method' == 'POST']">
+                <json:json-to-object-transformer returnClass="java.lang.Object" doc:name="JSON to Object"/>
+                <db:insert config-ref="MySQL_Configuration" doc:name="INSERIR FUNCIONARIO">
+                    <db:parameterized-query><![CDATA[insert into funcionario (id,nome,telefone,salario) values (#[message.payload.id], #[message.payload.nome], #[message.payload.telefone], #[message.payload.salario])]]></db:parameterized-query>
+                </db:insert>
+                <set-payload value="FUNCIONARIO INCLUIDO COM SUCESSO&quot;" doc:name="Set Payload"/>
+            </when>
+            <when expression="#[message.inboundProperties.'http.method' == 'GET']">
+                <db:select config-ref="MySQL_Configuration" doc:name="LISTAR FUNCIONARIO">
+                    <db:parameterized-query><![CDATA[select * from funcionario]]></db:parameterized-query>
+                </db:select>
+                <json:object-to-json-transformer returnClass="java.lang.Object" doc:name="Object to JSON"/>
+            </when>
+            <when expression="#[message.inboundProperties.'http.method' == 'PUT']">
+                <json:json-to-object-transformer returnClass="java.lang.Object" doc:name="update"/>
+                <db:update config-ref="MySQL_Configuration" doc:name="Database">
+                    <db:parameterized-query><![CDATA[update funcionario set nome = #[message.payload.nome], telefone = #[message.payload.telefone], salario = #[message.payload.salario] where id = #[message.payload.id]]]></db:parameterized-query>
+                </db:update>
+                <set-payload value="FUNCIONARIO ATUALIZADO COM SUCESSO" doc:name="Set Payload"/>
+            </when>
+        </choice>
+    </flow>
+	<flow name="salarioFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/funcionario/salariomedio" allowedMethods="GET" doc:name="HTTP"/>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[select avg(salario) as media from funcionario]]></db:parameterized-query>
+        </db:select>
+        <json:object-to-json-transformer returnClass="java.lang.Object" doc:name="Object to JSON"/>
+    </flow>
+    <flow name="bonusFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/funcionario/bonus/{id}" allowedMethods="GET" doc:name="HTTP"/>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[select FLOOR ((RAND() / 2)* salario) as bonus from funcionario where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+
+        </db:select>
+        <logger message="saida: #[message.payload]" level="INFO" doc:name="Logger"/>
+
+        <json:object-to-json-transformer returnClass="java.lang.Object" doc:name="Object to JSON"/>
+    </flow>   
+</mule>

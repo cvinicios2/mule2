@@ -1,0 +1,20 @@
+version: "3"
+services:
+  mule:
+    hostname: mule
+    build: .
+    ports:
+     - "8085:8081"
+    network_mode: bridge
+    links:
+    - "db-mule"
+  db-mule:
+    hostname: db-mule
+    build: ./dockerfile-mysql
+    command: --default-authentication-plugin=mysql_native_password
+    ports: 
+     - "3306:3306"
+    network_mode: bridge
+    environment:
+      MYSQL_ROOT_PASSWORD: "fiap2019"
+      MYSQL_DATABASE: "fiapdb2"
